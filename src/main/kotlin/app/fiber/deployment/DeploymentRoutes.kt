@@ -14,7 +14,7 @@ fun Route.deployment() = route("/api/deployment") {
 
     val deploymentRepository by inject<DeploymentRepository>()
 
-    post("/") {
+    post {
         val deployment = this.call.receive<Deployment>()
         deploymentRepository.insertDeployment(deployment)
 
@@ -32,7 +32,7 @@ fun Route.deployment() = route("/api/deployment") {
         }
     }
 
-    put("/") {
+    put {
         val deployment = this.call.receive<Deployment>()
         deploymentRepository.insertDeployment(deployment)
 
