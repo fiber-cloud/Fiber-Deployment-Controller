@@ -3,6 +3,7 @@ package app.fiber
 import app.fiber.cassandra.CassandraConnector
 import app.fiber.deployment.deployment
 import app.fiber.model.DeploymentRepository
+import app.fiber.metrics.metrics
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.application.install
@@ -57,6 +58,7 @@ fun Application.main() {
 
     install(Routing) {
         deployment()
+        metrics()
     }
 }
 
