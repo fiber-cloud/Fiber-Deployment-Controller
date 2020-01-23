@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fiber-deployment-controller
+  namespace: fiber
+  labels:
+    app: fiber-deployment-controller
+spec:
+  template:
+    metadata:
+      name: fiber-deployment-controller
+      labels:
+        app: fiber-deployment-controller
+    spec:
+      serviceAccountName: fiber-deployment-controller
+      containers:
+        - name: fiber-deployment-controller
+          image: eu.gcr.io/fiber-258319/fiber-deployment-controller:v1
+          imagePullPolicy: Always
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: fiber-deployment-controller
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fiber-deployment-controller-service
+  namespace: fiber
+spec:
+  selector:
+    app: fiber-deployment-controller
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fiber-deployment-controller
+  namespace: fiber
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: list-metrics
+rules:
+  - apiGroups:
+      - "metrics.k8s.io"
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: list-metrics_fiber-deployment-controller
+  namespace: fiber
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: list-metrics
+subjects:
+  - kind: ServiceAccount
+    name: fiber-deployment-controller
+    namespace: fiber
+---
