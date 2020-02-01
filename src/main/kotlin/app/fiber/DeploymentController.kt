@@ -3,7 +3,8 @@ package app.fiber
 import app.fiber.cassandra.CassandraConnector
 import app.fiber.deployment.deployment
 import app.fiber.model.DeploymentRepository
-import app.fiber.metrics.metrics
+import app.fiber.redis.RedisService
+import io.fabric8.kubernetes.client.DefaultKubernetesClient
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.application.install
@@ -58,7 +59,6 @@ fun Application.main() {
 
     install(Routing) {
         deployment()
-        metrics()
     }
 }
 
@@ -68,5 +68,9 @@ val deploymentControllerModule = module {
     val cassandra = CassandraConnector(cassandraHost)
     val deploymentRepository = DeploymentRepository(cassandra.session)
 
+    val redisHost = System.getenv("REDIS_SERVICE_HOST") ?: throw Exception("Redis host not found!")
+
     single { deploymentRepository }
+    single { DefaultKubernetesClient() }
+    single { RedisService(redisHost) }
 }
