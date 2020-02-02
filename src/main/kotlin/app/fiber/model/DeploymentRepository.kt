@@ -40,9 +40,6 @@ class DeploymentRepository(private val session: CqlSession) {
                 .value("type", QueryBuilder.bindMarker())
                 .value("minimum_amount", QueryBuilder.bindMarker())
                 .value("maximum_amount", QueryBuilder.bindMarker())
-                .value("jvm_configuration", QueryBuilder.bindMarker())
-                .value("start_parameters", QueryBuilder.bindMarker())
-                .value("system_properties", QueryBuilder.bindMarker())
                 .value("environment", QueryBuilder.bindMarker())
                 .build()
 
@@ -55,10 +52,7 @@ class DeploymentRepository(private val session: CqlSession) {
                 .setString(3, deployment.type)
                 .setInt(4, deployment.minimumAmount)
                 .setInt(5, deployment.maximumAmount)
-                .setList(6, deployment.jvmConfiguration, String::class.java)
-                .setList(7, deployment.startParameters, String::class.java)
-                .setMap(8, deployment.systemProperties, String::class.java, String::class.java)
-                .setMap(9, deployment.environment, String::class.java, String::class.java)
+                .setMap(6, deployment.environment, String::class.java, String::class.java)
 
         this.session.execute(boundStatement)
 
@@ -86,9 +80,6 @@ class DeploymentRepository(private val session: CqlSession) {
                     row.getString("type")!!,
                     row.getInt("minimum_amount"),
                     row.getInt("maximum_amount"),
-                    row.getList("jvm_configuration", String::class.java)!!,
-                    row.getList("start_parameters", String::class.java)!!,
-                    row.getMap("system_properties", String::class.java, String::class.java)!!,
                     row.getMap("environment", String::class.java, String::class.java)!!
             )
         }.one()
@@ -119,9 +110,6 @@ class DeploymentRepository(private val session: CqlSession) {
                 .withColumn("type", DataTypes.TEXT)
                 .withColumn("minimum_amount", DataTypes.INT)
                 .withColumn("maximum_amount", DataTypes.INT)
-                .withColumn("jvm_configuration", DataTypes.listOf(DataTypes.TEXT))
-                .withColumn("start_parameters", DataTypes.listOf(DataTypes.TEXT))
-                .withColumn("system_properties", DataTypes.mapOf(DataTypes.TEXT, DataTypes.TEXT))
                 .withColumn("environment", DataTypes.mapOf(DataTypes.TEXT, DataTypes.TEXT))
 
         this.session.execute(tableQuery.build())

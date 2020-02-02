@@ -9,8 +9,5 @@ data class Deployment(
         val type: String,
         val minimumAmount: Int,
         val maximumAmount: Int,
-        val jvmConfiguration: List<String>,
-        val startParameters: List<String>,
-        val systemProperties: Map<String, String>,
         val environment: Map<String, String>
 )
