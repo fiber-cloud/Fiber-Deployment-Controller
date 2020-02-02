@@ -1,6 +1,7 @@
 package app.fiber
 
 import app.fiber.cassandra.CassandraConnector
+import app.fiber.deployment.KubernetesDeploymentService
 import app.fiber.deployment.deployment
 import app.fiber.model.DeploymentRepository
 import app.fiber.redis.RedisService
@@ -28,7 +29,11 @@ import java.io.PrintWriter
 import java.io.StringWriter
 
 fun main(args: Array<String>) {
-    embeddedServer(Netty, commandLineEnvironment(args)).start(true)
+    val server = embeddedServer(Netty, commandLineEnvironment(args))
+
+    KubernetesDeploymentService()
+
+    server.start(true)
 }
 
 fun Application.main() {

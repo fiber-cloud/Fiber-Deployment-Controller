@@ -1,11 +1,16 @@
 package app.fiber.model
 
+import app.fiber.event.DeploymentDeletedEvent
+import app.fiber.event.DeploymentUpdatedEvent
+import app.fiber.event.EventBus
 import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.type.DataTypes
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder
 import com.datastax.oss.driver.shaded.guava.common.cache.CacheBuilder
 import com.datastax.oss.driver.shaded.guava.common.cache.CacheLoader
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.time.Duration
 import java.util.*
 
@@ -21,6 +26,8 @@ class DeploymentRepository(private val session: CqlSession) {
 
     init {
         this.createTable()
+
+        GlobalScope.launch { deployAll() }
     }
 
     fun insertDeployment(deployment: Deployment) {
@@ -29,7 +36,8 @@ class DeploymentRepository(private val session: CqlSession) {
         val deploymentInsert = QueryBuilder.insertInto(this.table)
                 .value("deployment_id", QueryBuilder.bindMarker())
                 .value("name", QueryBuilder.bindMarker())
-                .value("template", QueryBuilder.bindMarker())
+                .value("image", QueryBuilder.bindMarker())
+                .value("type", QueryBuilder.bindMarker())
                 .value("minimum_amount", QueryBuilder.bindMarker())
                 .value("maximum_amount", QueryBuilder.bindMarker())
                 .value("jvm_configuration", QueryBuilder.bindMarker())
@@ -43,15 +51,18 @@ class DeploymentRepository(private val session: CqlSession) {
         val boundStatement = statement.bind()
                 .setUuid(0, deployment.uuid)
                 .setString(1, deployment.name)
-                .setString(2, deployment.template)
-                .setInt(3, deployment.minimumAmount)
-                .setInt(4, deployment.maximumAmount)
-                .setList(5, deployment.jvmConfiguration, String::class.java)
-                .setList(6, deployment.startParameters, String::class.java)
-                .setMap(7, deployment.systemProperties, String::class.java, String::class.java)
-                .setMap(8, deployment.environment, String::class.java, String::class.java)
+                .setString(2, deployment.image)
+                .setString(3, deployment.type)
+                .setInt(4, deployment.minimumAmount)
+                .setInt(5, deployment.maximumAmount)
+                .setList(6, deployment.jvmConfiguration, String::class.java)
+                .setList(7, deployment.startParameters, String::class.java)
+                .setMap(8, deployment.systemProperties, String::class.java, String::class.java)
+                .setMap(9, deployment.environment, String::class.java, String::class.java)
 
         this.session.execute(boundStatement)
+
+        EventBus.fire(DeploymentUpdatedEvent(deployment))
     }
 
     fun getDeploymentById(deploymentId: UUID): Deployment? {
@@ -71,7 +82,8 @@ class DeploymentRepository(private val session: CqlSession) {
             Deployment(
                     row.getUuid("deployment_id")!!,
                     row.getString("name")!!,
-                    row.getString("template")!!,
+                    row.getString("image")!!,
+                    row.getString("type")!!,
                     row.getInt("minimum_amount"),
                     row.getInt("maximum_amount"),
                     row.getList("jvm_configuration", String::class.java)!!,
@@ -94,6 +106,8 @@ class DeploymentRepository(private val session: CqlSession) {
 
         this.session.execute(boundStatement)
         this.cache.invalidate(deployment.uuid)
+
+        EventBus.fire(DeploymentDeletedEvent(deployment))
     }
 
     private fun createTable() {
@@ -101,7 +115,8 @@ class DeploymentRepository(private val session: CqlSession) {
                 .ifNotExists()
                 .withPartitionKey("deployment_id", DataTypes.UUID)
                 .withColumn("name", DataTypes.TEXT)
-                .withColumn("template", DataTypes.TEXT)
+                .withColumn("image", DataTypes.TEXT)
+                .withColumn("type", DataTypes.TEXT)
                 .withColumn("minimum_amount", DataTypes.INT)
                 .withColumn("maximum_amount", DataTypes.INT)
                 .withColumn("jvm_configuration", DataTypes.listOf(DataTypes.TEXT))
@@ -110,6 +125,25 @@ class DeploymentRepository(private val session: CqlSession) {
                 .withColumn("environment", DataTypes.mapOf(DataTypes.TEXT, DataTypes.TEXT))
 
         this.session.execute(tableQuery.build())
+    }
+
+    private fun deployAll() {
+        val getAllKeysQuery = QueryBuilder.selectFrom(this.table)
+                .column("deployment_id")
+                .build()
+
+        val statement = this.session.prepare(getAllKeysQuery)
+        val result = this.session.execute(statement.bind())
+
+        result.forEach { row ->
+            GlobalScope.launch {
+                row.getUuid("deployment_id")?.let { id ->
+                    getDeploymentById(id)?.let { deployment ->
+                        EventBus.fire(DeploymentUpdatedEvent(deployment))
+                    }
+                }
+            }
+        }
     }
 
 }

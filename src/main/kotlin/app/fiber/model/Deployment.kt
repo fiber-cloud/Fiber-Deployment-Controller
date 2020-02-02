@@ -5,7 +5,8 @@ import java.util.*
 data class Deployment(
         val uuid: UUID,
         val name: String,
-        val template: String,
+        val image: String,
+        val type: String,
         val minimumAmount: Int,
         val maximumAmount: Int,
         val jvmConfiguration: List<String>,
