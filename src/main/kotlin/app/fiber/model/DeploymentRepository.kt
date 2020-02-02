@@ -38,6 +38,7 @@ class DeploymentRepository(private val session: CqlSession) {
                 .value("name", QueryBuilder.bindMarker())
                 .value("image", QueryBuilder.bindMarker())
                 .value("type", QueryBuilder.bindMarker())
+                .value("dynamic", QueryBuilder.bindMarker())
                 .value("minimum_amount", QueryBuilder.bindMarker())
                 .value("maximum_amount", QueryBuilder.bindMarker())
                 .value("environment", QueryBuilder.bindMarker())
@@ -50,9 +51,10 @@ class DeploymentRepository(private val session: CqlSession) {
                 .setString(1, deployment.name)
                 .setString(2, deployment.image)
                 .setString(3, deployment.type)
-                .setInt(4, deployment.minimumAmount)
-                .setInt(5, deployment.maximumAmount)
-                .setMap(6, deployment.environment, String::class.java, String::class.java)
+                .setBoolean(4, deployment.dynamic)
+                .setInt(5, deployment.minimumAmount)
+                .setInt(6, deployment.maximumAmount)
+                .setMap(7, deployment.environment, String::class.java, String::class.java)
 
         this.session.execute(boundStatement)
 
@@ -78,6 +80,7 @@ class DeploymentRepository(private val session: CqlSession) {
                     row.getString("name")!!,
                     row.getString("image")!!,
                     row.getString("type")!!,
+                    row.getBoolean("dynamic"),
                     row.getInt("minimum_amount"),
                     row.getInt("maximum_amount"),
                     row.getMap("environment", String::class.java, String::class.java)!!
@@ -108,6 +111,7 @@ class DeploymentRepository(private val session: CqlSession) {
                 .withColumn("name", DataTypes.TEXT)
                 .withColumn("image", DataTypes.TEXT)
                 .withColumn("type", DataTypes.TEXT)
+                .withColumn("dynamic", DataTypes.BOOLEAN)
                 .withColumn("minimum_amount", DataTypes.INT)
                 .withColumn("maximum_amount", DataTypes.INT)
                 .withColumn("environment", DataTypes.mapOf(DataTypes.TEXT, DataTypes.TEXT))

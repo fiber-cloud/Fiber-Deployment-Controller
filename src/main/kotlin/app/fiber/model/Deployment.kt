@@ -7,6 +7,7 @@ data class Deployment(
         val name: String,
         val image: String,
         val type: String,
+        val dynamic: Boolean,
         val minimumAmount: Int,
         val maximumAmount: Int,
         val environment: Map<String, String>
