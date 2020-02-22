@@ -1,8 +1,8 @@
 package app.fiber.model
 
-import app.fiber.event.DeploymentDeletedEvent
-import app.fiber.event.DeploymentUpdatedEvent
 import app.fiber.event.EventBus
+import app.fiber.event.events.DeploymentDeletedEvent
+import app.fiber.event.events.DeploymentUpdatedEvent
 import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.type.DataTypes
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
@@ -128,11 +128,9 @@ class DeploymentRepository(private val session: CqlSession) {
         val result = this.session.execute(statement.bind())
 
         result.forEach { row ->
-            GlobalScope.launch {
-                row.getUuid("deployment_id")?.let { id ->
-                    getDeploymentById(id)?.let { deployment ->
-                        EventBus.fire(DeploymentUpdatedEvent(deployment))
-                    }
+            row.getUuid("deployment_id")?.let { id ->
+                getDeploymentById(id)?.let { deployment ->
+                    EventBus.fire(DeploymentUpdatedEvent(deployment))
                 }
             }
         }
