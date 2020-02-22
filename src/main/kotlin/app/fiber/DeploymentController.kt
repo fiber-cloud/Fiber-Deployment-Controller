@@ -1,10 +1,16 @@
 package app.fiber
 
-import app.fiber.cassandra.CassandraConnector
 import app.fiber.deployment.DeploymentRepository
+import app.fiber.deployment.database.CassandraDeploymentDatabase
+import app.fiber.deployment.database.DeploymentDatabase
 import app.fiber.deployment.route.deployment
-import app.fiber.deployment.service.KubernetesDeploymentService
-import app.fiber.redis.RedisService
+import app.fiber.deployment.service.DeploymentService
+import app.fiber.deployment.service.kubernetes.KubernetesDeploymentService
+import app.fiber.image.ImageAllocatorService
+import app.fiber.image.TemplateImageAllocatorService
+import app.fiber.logger.logger
+import com.datastax.oss.driver.api.core.CqlSession
+import com.datastax.oss.driver.api.core.CqlSessionBuilder
 import io.fabric8.kubernetes.client.DefaultKubernetesClient
 import io.ktor.application.Application
 import io.ktor.application.call
@@ -23,36 +29,42 @@ import io.ktor.routing.Routing
 import io.ktor.server.engine.commandLineEnvironment
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import org.koin.core.context.startKoin
 import org.koin.dsl.module
-import org.koin.ktor.ext.Koin
 import java.io.PrintWriter
 import java.io.StringWriter
+import java.net.InetSocketAddress
 
 fun main(args: Array<String>) {
+    startKoin { modules(deploymentControllerModule) }
     embeddedServer(Netty, commandLineEnvironment(args)).start(true)
-
-    // TODO start in koin?
-    KubernetesDeploymentService()
 }
 
 val deploymentControllerModule = module {
-    val cassandraHost = System.getenv("CASSANDRA_SERVICE_HOST") ?: throw Exception("Cassandra host not found!")
+    val logger by logger()
 
-    val cassandra = CassandraConnector(cassandraHost)
-    val deploymentRepository = DeploymentRepository()
+    val cassandraHost = System.getenv("CASSANDRA_SERVICE_HOST") ?: "".also {
+        logger.error("Cassandra host not found!")
+    }
 
-    val redisHost = System.getenv("REDIS_SERVICE_HOST") ?: throw Exception("Redis host not found!")
+    val session: CqlSession = CqlSessionBuilder()
+            .addContactPoint(InetSocketAddress(cassandraHost, 9042))
+            .withLocalDatacenter("datacenter1")
+            .build()
 
-    single { deploymentRepository }
+    val templateStorageHost = System.getenv("FIBER_TEMPLATE_STORAGE_SERVICE_HOST") ?: "".also {
+        logger.error("Fiber-Template-Storage host not found!")
+    }
+
     single { DefaultKubernetesClient() }
-    single { RedisService(redisHost) }
+    single<ImageAllocatorService> { TemplateImageAllocatorService(templateStorageHost) }
+
+    single<DeploymentDatabase> { CassandraDeploymentDatabase(session) }
+    single<DeploymentService> { KubernetesDeploymentService() }
+    single { DeploymentRepository() }
 }
 
 fun Application.main() {
-    install(Koin) {
-        modules(deploymentControllerModule)
-    }
-
     install(DefaultHeaders)
     install(CallLogging)
     install(ContentNegotiation) {

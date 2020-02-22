@@ -1,10 +1,11 @@
-package app.fiber.deployment.service
+package app.fiber.deployment.service.kubernetes
 
 import app.fiber.deployment.model.Deployment
+import app.fiber.deployment.service.DeploymentService
 import app.fiber.event.EventBus
 import app.fiber.event.events.DeploymentDeletedEvent
 import app.fiber.event.events.DeploymentUpdatedEvent
-import app.fiber.image.DockerImageAllocatorService
+import app.fiber.image.ImageAllocatorService
 import io.fabric8.kubernetes.api.model.NamespaceBuilder
 import io.fabric8.kubernetes.client.DefaultKubernetesClient
 import kotlinx.coroutines.Dispatchers
@@ -16,29 +17,17 @@ class KubernetesDeploymentService : DeploymentService, KoinComponent {
 
     private val kubernetesClient by inject<DefaultKubernetesClient>()
 
-    private val dockerImageAllocatorService = DockerImageAllocatorService()
+    private val imageAllocatorService by inject<ImageAllocatorService>()
 
     init {
         this.createNamespace("fiber-deployments-server")
         this.createNamespace("fiber-deployments-proxy")
     }
 
-    init {
-        EventBus.subscribe<DeploymentUpdatedEvent> { event ->
-            deploy(event.deployment)
-        }
-
-        EventBus.subscribe<DeploymentDeletedEvent> { event ->
-            rejectDeployment(event.deployment)
-        }
-    }
-
     override suspend fun deploy(deployment: Deployment) {
-        val image = withContext(Dispatchers.Default) { dockerImageAllocatorService.getNewestImage(deployment) }
+        val image = withContext(Dispatchers.Default) { imageAllocatorService.getCurrentImage(deployment) }
         val namespace = "fiber-deployments-${deployment.type}"
-
         val kubernetesDeployment = KubernetesDeploymentBuilder(deployment, namespace, image).buildDeployment()
-
 
         this.kubernetesClient.inNamespace(namespace)
                 .apps()

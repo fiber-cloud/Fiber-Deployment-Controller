@@ -2,6 +2,7 @@ package app.fiber.deployment
 
 import app.fiber.deployment.database.DeploymentDatabase
 import app.fiber.deployment.model.Deployment
+import app.fiber.deployment.service.DeploymentService
 import app.fiber.event.EventBus
 import app.fiber.event.events.DeploymentDeletedEvent
 import app.fiber.event.events.DeploymentUpdatedEvent
@@ -15,9 +16,20 @@ class DeploymentRepository : KoinComponent {
 
     private val deploymentDatabase by inject<DeploymentDatabase>()
 
-    // TODO remove
+    private val deploymentService by inject<DeploymentService>()
+
     init {
-        GlobalScope.launch { deployAll() }
+        EventBus.subscribe<DeploymentUpdatedEvent> { event ->
+            this.deploymentService.deploy(event.deployment)
+        }
+
+        EventBus.subscribe<DeploymentDeletedEvent> { event ->
+            this.deploymentService.rejectDeployment(event.deployment)
+        }
+
+        this.deploymentDatabase.getAllDeployments().forEach {
+            EventBus.fire(DeploymentUpdatedEvent(it))
+        }
     }
 
     fun insertDeployment(deployment: Deployment) {
@@ -38,12 +50,6 @@ class DeploymentRepository : KoinComponent {
         }
 
         EventBus.fire(DeploymentDeletedEvent(deployment))
-    }
-
-    private fun deployAll() {
-        this.deploymentDatabase.getAllDeployments().forEach {
-            EventBus.fire(DeploymentUpdatedEvent(it))
-        }
     }
 
 }

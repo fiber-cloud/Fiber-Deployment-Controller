@@ -4,24 +4,20 @@ import app.fiber.deployment.model.Deployment
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 
-class DockerImageAllocatorService {
+class TemplateImageAllocatorService(private val host: String) : ImageAllocatorService {
 
     private val client = HttpClient()
-
-    private val templateStorageHost = System.getenv("FIBER_TEMPLATE_STORAGE_SERVICE_HOST")
-            ?: throw Exception("Fiber-Template-Storage host not found!")
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread(this.client::close))
     }
 
-    // TODO api in template storage may not look like this
-    suspend fun getNewestImage(deployment: Deployment): String {
+    override suspend fun getCurrentImage(deployment: Deployment): String {
         if (deployment.dynamic) return deployment.image
 
-        val result = this.client.get<DockerImageResponse> {
+        val result = this.client.get<ImageResponse> {
             url {
-                host = templateStorageHost
+                host = this@TemplateImageAllocatorService.host
                 encodedPath = "/template/api/snapshots/${deployment.uuid}"
             }
         }
@@ -31,4 +27,4 @@ class DockerImageAllocatorService {
 
 }
 
-data class DockerImageResponse(val image: String)
+data class ImageResponse(val image: String)

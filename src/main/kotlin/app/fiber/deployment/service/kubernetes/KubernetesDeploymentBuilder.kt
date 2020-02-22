@@ -1,4 +1,4 @@
-package app.fiber.deployment.service
+package app.fiber.deployment.service.kubernetes
 
 import app.fiber.deployment.model.Deployment
 import io.fabric8.kubernetes.api.model.*

@@ -2,6 +2,8 @@ package app.fiber.deployment.database
 
 import app.fiber.deployment.model.Deployment
 import com.datastax.oss.driver.api.core.CqlSession
+import com.datastax.oss.driver.api.core.PagingIterable
+import com.datastax.oss.driver.api.core.cql.ResultSet
 import com.datastax.oss.driver.api.core.type.DataTypes
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder
@@ -17,11 +19,16 @@ class CassandraDeploymentDatabase(private val session: CqlSession) : DeploymentD
     private val cache = CacheBuilder.newBuilder()
             .expireAfterAccess(Duration.ofSeconds(30))
             .build(object : CacheLoader<UUID, Deployment?>() {
+
                 override fun load(key: UUID): Deployment? = loadDeploymentById(key)
-            })!!
+
+            })
 
     init {
+        this.createKeyspace()
         this.createTable()
+
+        Runtime.getRuntime().addShutdownHook(Thread(this.session::close))
     }
 
     override fun getDeploymentById(deploymentId: UUID): Deployment? = this.cache.get(deploymentId)
@@ -33,18 +40,7 @@ class CassandraDeploymentDatabase(private val session: CqlSession) : DeploymentD
 
         val result = this.session.execute(this.session.prepare(selectAllDeployments).bind())
 
-        return result.map { row ->
-            Deployment(
-                    row.getUuid("deployment_id")!!,
-                    row.getString("name")!!,
-                    row.getString("image")!!,
-                    row.getString("type")!!,
-                    row.getBoolean("dynamic"),
-                    row.getInt("minimum_amount"),
-                    row.getInt("maximum_amount"),
-                    row.getMap("environment", String::class.java, String::class.java)!!
-            )
-        }.all()
+        return result.mapToDeployments().all()
     }
 
     override suspend fun insertDeployment(deployment: Deployment) {
@@ -90,6 +86,16 @@ class CassandraDeploymentDatabase(private val session: CqlSession) : DeploymentD
         this.cache.invalidate(deployment.uuid)
     }
 
+    private fun createKeyspace() {
+        val keyspaceName = "fiber_deployment"
+        val createKeyspace = SchemaBuilder.createKeyspace(keyspaceName)
+                .ifNotExists()
+                .withSimpleStrategy(1)
+
+        this.session.execute(createKeyspace.build())
+        this.session.execute("USE $keyspaceName")
+    }
+
     private fun createTable() {
         val tableQuery = SchemaBuilder.createTable(this.table)
                 .ifNotExists()
@@ -118,7 +124,11 @@ class CassandraDeploymentDatabase(private val session: CqlSession) : DeploymentD
 
         val result = this.session.execute(boundStatement)
 
-        return result.map { row ->
+        return result.mapToDeployments().one()
+    }
+
+    private fun ResultSet.mapToDeployments(): PagingIterable<Deployment> {
+        return this.map { row ->
             Deployment(
                     row.getUuid("deployment_id")!!,
                     row.getString("name")!!,
@@ -129,7 +139,7 @@ class CassandraDeploymentDatabase(private val session: CqlSession) : DeploymentD
                     row.getInt("maximum_amount"),
                     row.getMap("environment", String::class.java, String::class.java)!!
             )
-        }.one()
+        }
     }
 
 }
