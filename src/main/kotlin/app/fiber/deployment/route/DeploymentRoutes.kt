@@ -1,7 +1,7 @@
-package app.fiber.deployment
+package app.fiber.deployment.route
 
-import app.fiber.model.Deployment
-import app.fiber.model.DeploymentRepository
+import app.fiber.deployment.DeploymentRepository
+import app.fiber.deployment.model.Deployment
 import io.ktor.application.call
 import io.ktor.http.HttpStatusCode
 import io.ktor.request.receive
@@ -21,6 +21,11 @@ fun Route.deployment() = route("/api/deployment") {
         this.call.respond(HttpStatusCode.Created)
     }
 
+    get {
+        val deployments = deploymentRepository.getAllDeployments()
+        this.call.respond(HttpStatusCode.OK, deployments)
+    }
+
     get("/{id}") {
         val uuid = this.call.parameters["id"]!!
         val deployment = deploymentRepository.getDeploymentById(UUID.fromString(uuid))
@@ -28,7 +33,7 @@ fun Route.deployment() = route("/api/deployment") {
         if (deployment == null) {
             this.call.respond(HttpStatusCode.NotFound)
         } else {
-            this.call.respond(deployment)
+            this.call.respond(HttpStatusCode.OK, deployment)
         }
     }
 

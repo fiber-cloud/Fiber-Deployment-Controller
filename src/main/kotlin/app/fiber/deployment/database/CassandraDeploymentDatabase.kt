@@ -1,36 +1,53 @@
-package app.fiber.model
+package app.fiber.deployment.database
 
-import app.fiber.event.EventBus
-import app.fiber.event.events.DeploymentDeletedEvent
-import app.fiber.event.events.DeploymentUpdatedEvent
+import app.fiber.deployment.model.Deployment
 import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.type.DataTypes
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder
 import com.datastax.oss.driver.shaded.guava.common.cache.CacheBuilder
 import com.datastax.oss.driver.shaded.guava.common.cache.CacheLoader
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import java.time.Duration
 import java.util.*
 
-class DeploymentRepository(private val session: CqlSession) {
+class CassandraDeploymentDatabase(private val session: CqlSession) : DeploymentDatabase {
 
     private val table = "deployments"
 
     private val cache = CacheBuilder.newBuilder()
             .expireAfterAccess(Duration.ofSeconds(30))
             .build(object : CacheLoader<UUID, Deployment?>() {
-                override fun load(key: UUID): Deployment? = getDeploymentById(key)
+                override fun load(key: UUID): Deployment? = loadDeploymentById(key)
             })!!
 
     init {
         this.createTable()
-
-        GlobalScope.launch { deployAll() }
     }
 
-    fun insertDeployment(deployment: Deployment) {
+    override fun getDeploymentById(deploymentId: UUID): Deployment? = this.cache.get(deploymentId)
+
+    override fun getAllDeployments(): List<Deployment> {
+        val selectAllDeployments = QueryBuilder.selectFrom(this.table)
+                .all()
+                .build()
+
+        val result = this.session.execute(this.session.prepare(selectAllDeployments).bind())
+
+        return result.map { row ->
+            Deployment(
+                    row.getUuid("deployment_id")!!,
+                    row.getString("name")!!,
+                    row.getString("image")!!,
+                    row.getString("type")!!,
+                    row.getBoolean("dynamic"),
+                    row.getInt("minimum_amount"),
+                    row.getInt("maximum_amount"),
+                    row.getMap("environment", String::class.java, String::class.java)!!
+            )
+        }.all()
+    }
+
+    override suspend fun insertDeployment(deployment: Deployment) {
         this.cache.invalidate(deployment.uuid)
 
         val deploymentInsert = QueryBuilder.insertInto(this.table)
@@ -57,11 +74,38 @@ class DeploymentRepository(private val session: CqlSession) {
                 .setMap(7, deployment.environment, String::class.java, String::class.java)
 
         this.session.execute(boundStatement)
-
-        EventBus.fire(DeploymentUpdatedEvent(deployment))
     }
 
-    fun getDeploymentById(deploymentId: UUID): Deployment? {
+    override suspend fun deleteDeployment(deployment: Deployment) {
+        val deploymentDelete = QueryBuilder.deleteFrom(this.table)
+                .whereColumn("deployment_id")
+                .isEqualTo(QueryBuilder.bindMarker())
+                .build()
+
+        val statement = this.session.prepare(deploymentDelete)
+        val boundStatement = statement.bind()
+                .setUuid(0, deployment.uuid)
+
+        this.session.execute(boundStatement)
+        this.cache.invalidate(deployment.uuid)
+    }
+
+    private fun createTable() {
+        val tableQuery = SchemaBuilder.createTable(this.table)
+                .ifNotExists()
+                .withPartitionKey("deployment_id", DataTypes.UUID)
+                .withColumn("name", DataTypes.TEXT)
+                .withColumn("image", DataTypes.TEXT)
+                .withColumn("type", DataTypes.TEXT)
+                .withColumn("dynamic", DataTypes.BOOLEAN)
+                .withColumn("minimum_amount", DataTypes.INT)
+                .withColumn("maximum_amount", DataTypes.INT)
+                .withColumn("environment", DataTypes.mapOf(DataTypes.TEXT, DataTypes.TEXT))
+
+        this.session.execute(tableQuery.build())
+    }
+
+    private fun loadDeploymentById(deploymentId: UUID): Deployment? {
         val deploymentSelect = QueryBuilder.selectFrom(this.table)
                 .all()
                 .whereColumn("deployment_id")
@@ -86,54 +130,6 @@ class DeploymentRepository(private val session: CqlSession) {
                     row.getMap("environment", String::class.java, String::class.java)!!
             )
         }.one()
-    }
-
-    fun deleteDeployment(deployment: Deployment) {
-        val deploymentDelete = QueryBuilder.deleteFrom(this.table)
-                .whereColumn("deployment_id")
-                .isEqualTo(QueryBuilder.bindMarker())
-                .build()
-
-        val statement = this.session.prepare(deploymentDelete)
-        val boundStatement = statement.bind()
-                .setUuid(0, deployment.uuid)
-
-        this.session.execute(boundStatement)
-        this.cache.invalidate(deployment.uuid)
-
-        EventBus.fire(DeploymentDeletedEvent(deployment))
-    }
-
-    private fun createTable() {
-        val tableQuery = SchemaBuilder.createTable(this.table)
-                .ifNotExists()
-                .withPartitionKey("deployment_id", DataTypes.UUID)
-                .withColumn("name", DataTypes.TEXT)
-                .withColumn("image", DataTypes.TEXT)
-                .withColumn("type", DataTypes.TEXT)
-                .withColumn("dynamic", DataTypes.BOOLEAN)
-                .withColumn("minimum_amount", DataTypes.INT)
-                .withColumn("maximum_amount", DataTypes.INT)
-                .withColumn("environment", DataTypes.mapOf(DataTypes.TEXT, DataTypes.TEXT))
-
-        this.session.execute(tableQuery.build())
-    }
-
-    private fun deployAll() {
-        val getAllKeysQuery = QueryBuilder.selectFrom(this.table)
-                .column("deployment_id")
-                .build()
-
-        val statement = this.session.prepare(getAllKeysQuery)
-        val result = this.session.execute(statement.bind())
-
-        result.forEach { row ->
-            row.getUuid("deployment_id")?.let { id ->
-                getDeploymentById(id)?.let { deployment ->
-                    EventBus.fire(DeploymentUpdatedEvent(deployment))
-                }
-            }
-        }
     }
 
 }

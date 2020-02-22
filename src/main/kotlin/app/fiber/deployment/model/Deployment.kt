@@ -1,4 +1,4 @@
-package app.fiber.model
+package app.fiber.deployment.model
 
 import java.util.*
 

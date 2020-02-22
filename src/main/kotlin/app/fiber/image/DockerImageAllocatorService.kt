@@ -1,6 +1,6 @@
 package app.fiber.image
 
-import app.fiber.model.Deployment
+import app.fiber.deployment.model.Deployment
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 
