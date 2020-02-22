@@ -1,8 +1,8 @@
 package app.fiber.deployment
 
-import app.fiber.event.DeploymentDeletedEvent
-import app.fiber.event.DeploymentUpdatedEvent
 import app.fiber.event.EventBus
+import app.fiber.event.events.DeploymentDeletedEvent
+import app.fiber.event.events.DeploymentUpdatedEvent
 import app.fiber.image.DockerImageAllocatorService
 import app.fiber.model.Deployment
 import io.fabric8.kubernetes.api.model.ContainerBuilder
@@ -12,8 +12,6 @@ import io.fabric8.kubernetes.api.model.NamespaceBuilder
 import io.fabric8.kubernetes.api.model.apps.DeploymentBuilder
 import io.fabric8.kubernetes.client.DefaultKubernetesClient
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.KoinComponent
 import org.koin.core.inject
@@ -43,11 +41,11 @@ class KubernetesDeploymentService : KoinComponent {
 
     init {
         EventBus.subscribe<DeploymentUpdatedEvent> { event ->
-            GlobalScope.launch { deployToKubernetes(event.deployment) }
+            deployToKubernetes(event.deployment)
         }
 
         EventBus.subscribe<DeploymentDeletedEvent> { event ->
-            GlobalScope.launch { deleteKubernetesDeployment(event.deployment) }
+            deleteKubernetesDeployment(event.deployment)
         }
     }
 
