@@ -15,6 +15,8 @@ import io.fabric8.kubernetes.client.DefaultKubernetesClient
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.application.install
+import io.ktor.client.HttpClient
+import io.ktor.client.features.json.JsonFeature
 import io.ktor.features.CallLogging
 import io.ktor.features.ContentNegotiation
 import io.ktor.features.DefaultHeaders
@@ -55,6 +57,13 @@ val deploymentControllerModule = module {
     val templateStorageHost = System.getenv("FIBER_TEMPLATE_STORAGE_SERVICE_HOST") ?: "".also {
         logger.error("Fiber-Template-Storage host not found!")
     }
+
+    val httpClient = HttpClient {
+        install(JsonFeature)
+    }
+    Runtime.getRuntime().addShutdownHook(Thread(httpClient::close))
+
+    single { httpClient }
 
     single { DefaultKubernetesClient() }
     single<ImageAllocatorService> { TemplateImageAllocatorService(templateStorageHost) }

@@ -24,6 +24,7 @@ dependencies {
     implementation(Dependencies.ktorNetty)
     implementation(Dependencies.ktorJwt)
     implementation(Dependencies.ktorGson)
+    implementation(Dependencies.ktorClientGson)
 
     implementation(Dependencies.ktorClient)
 
@@ -36,6 +37,7 @@ dependencies {
     testImplementation(Dependencies.junit)
     testImplementation(Dependencies.ktorTestEngine)
     testImplementation(Dependencies.mockk)
+    testImplementation(Dependencies.koinTest)
 }
 
 tasks {
@@ -100,6 +102,7 @@ object Dependencies {
     const val ktorJwt =  "io.ktor:ktor-auth-jwt:${Version.ktor}"
     const val ktorGson =  "io.ktor:ktor-gson:${Version.ktor}"
     const val ktorClient = "io.ktor:ktor-client-apache:${Version.ktor}"
+    const val ktorClientGson ="io.ktor:ktor-client-gson:${Version.ktor}"
 
     const val kubernetes = "io.fabric8:kubernetes-client:${Version.kubernetes}"
 
@@ -113,4 +116,5 @@ object Dependencies {
     const val junit = "org.junit.jupiter:junit-jupiter-api:${Version.junit}"
     const val ktorTestEngine = "io.ktor:ktor-server-test-host:${Version.ktor}"
     const val mockk = "io.mockk:mockk:${Version.mockk}"
+    const val koinTest = "org.koin:koin-test:${Version.koin}"
 }
