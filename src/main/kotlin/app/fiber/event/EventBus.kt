@@ -1,6 +1,7 @@
 package app.fiber.event
 
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
 
@@ -36,8 +37,10 @@ object EventBus {
      * Fire a specific [event][Event] and launch a coroutine for every [EventHandler].
      *
      * @param [event] [Event] to fire.
+     *
+     * @return [List] of [jobs][Job] to sync the event.
      */
-    fun fire(event: Event) = this.subscribers[event::class]?.forEach { handler ->
+    fun fire(event: Event) = this.subscribers[event::class]?.map { handler ->
         GlobalScope.launch {
             handler.invoke(event)
         }
